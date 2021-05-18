@@ -1,0 +1,92 @@
+plugins {
+    id 'java-library'
+    id 'jacoco'
+    id 'maven-publish'
+    id 'signing'
+}
+
+repositories {
+    mavenCentral()
+}
+
+group = 'de.spinscale.javalin'
+version = '0.2.0-SNAPSHOT'
+
+dependencies {
+    // javalin is usually taken in as a dependency, no need to have a hard dependency
+    compileOnlyApi 'io.javalin:javalin:3.13.7'
+    testRuntimeOnly 'io.javalin:javalin:3.13.7'
+
+    testImplementation "org.assertj:assertj-core:3.19.0"
+    testImplementation 'org.mockito:mockito-core:3.10.0'
+    testImplementation 'org.slf4j:slf4j-simple:1.7.30'
+    testImplementation 'com.squareup.okhttp3:okhttp:4.9.1'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.2'
+    testImplementation 'org.junit.jupiter:junit-jupiter-engine:5.7.2'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+task sourcesJar(type: Jar) {
+    from sourceSets.main.allJava
+    archiveClassifier = 'sources'
+}
+
+task javadocJar(type: Jar) {
+    from javadoc
+    archiveClassifier = 'javadoc'
+}
+
+publishing {
+    repositories {
+        maven {
+            def releasesRepoUrl = "https://oss.sonatype.org/service/local/staging/deploy/maven2"
+            def snapshotsRepoUrl = "https://oss.sonatype.org/content/repositories/snapshots"
+            url = version.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
+            credentials {
+                username project.findProperty('nexusUsername')
+                password project.findProperty('nexusPassword')
+            }
+        }
+    }
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            artifact sourcesJar
+            artifact javadocJar
+            pom {
+                name = 'Cookie based session store for Javalin'
+                description = 'Allows to store session data in a JWT based cookie'
+                url = 'https://github.com/spinscale/javalin-cookie-session-store'
+
+                scm {
+                    connection = 'scm:git:git://github.com/spinscale/javalin-cookie-session-store.git'
+                    developerConnection = 'scm:git:ssh://github.com/spinscale/javalin-cookie-session-store.git'
+                    url = 'https://github.com/spinscale/javalin-cookie-session-store'
+                }
+
+                licenses {
+                    license {
+                        name = 'The Apache License, Version 2.0'
+                        url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                    }
+                }
+
+                developers {
+                    developer {
+                        id = 'spinscale'
+                        name = 'Alexander Reelsen'
+                        email = 'alr@spinscale.de'
+                    }
+                }
+            }
+        }
+    }
+}
+
+signing {
+    sign publishing.publications.mavenJava
+}
