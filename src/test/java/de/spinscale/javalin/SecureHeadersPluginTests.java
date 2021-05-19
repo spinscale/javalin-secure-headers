@@ -17,12 +17,13 @@
 
 package de.spinscale.javalin;
 
-import de.spinscale.javalin.SecureHeadersPlugin.Builder.ClearSiteData;
-import de.spinscale.javalin.SecureHeadersPlugin.Builder.CrossDomainPolicy;
-import de.spinscale.javalin.SecureHeadersPlugin.Builder.CrossOriginEmbedderPolicy;
-import de.spinscale.javalin.SecureHeadersPlugin.Builder.CrossOriginOpenerPolicy;
-import de.spinscale.javalin.SecureHeadersPlugin.Builder.CrossOriginResourcePolicy;
-import de.spinscale.javalin.SecureHeadersPlugin.Builder.ReferrerPolicy;
+import de.spinscale.javalin.SecureHeadersPlugin.SecureHeaders.ClearSiteData;
+import de.spinscale.javalin.SecureHeadersPlugin.SecureHeaders.CrossDomainPolicy;
+import de.spinscale.javalin.SecureHeadersPlugin.SecureHeaders.CrossOriginEmbedderPolicy;
+import de.spinscale.javalin.SecureHeadersPlugin.SecureHeaders.CrossOriginOpenerPolicy;
+import de.spinscale.javalin.SecureHeadersPlugin.SecureHeaders.CrossOriginResourcePolicy;
+import de.spinscale.javalin.SecureHeadersPlugin.SecureHeaders.ReferrerPolicy;
+import de.spinscale.javalin.SecureHeadersPlugin.SecureHeaders.XFrameOptions;
 import io.javalin.Javalin;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -32,69 +33,65 @@ import org.junit.jupiter.api.Test;
 import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class SecureHeadersPluginTests {
 
     @Test
     public void testHeaderValues() {
-        final SecureHeadersPlugin.Builder builder = SecureHeadersPlugin.builder();
+        final SecureHeadersPlugin.SecureHeaders headers = new SecureHeadersPlugin.SecureHeaders();
 
-        builder.xContentTypeOptionsNoSniff();
-        assertThat(builder.headers()).containsEntry("X-Content-Type-Options", "nosniff");
+        headers.xContentTypeOptionsNoSniff();
+        assertThat(headers.headers()).containsEntry("X-Content-Type-Options", "nosniff");
 
-        builder.strictTransportSecurity(Duration.ofSeconds(10), false);
-        assertThat(builder.headers()).containsEntry("Strict-Transport-Security", "max-age=10");
+        headers.strictTransportSecurity(Duration.ofSeconds(10), false);
+        assertThat(headers.headers()).containsEntry("Strict-Transport-Security", "max-age=10");
 
-        builder.strictTransportSecurity(Duration.ofSeconds(10), true);
-        assertThat(builder.headers()).containsEntry("Strict-Transport-Security", "max-age=10 ; includeSubDomains");
+        headers.strictTransportSecurity(Duration.ofSeconds(10), true);
+        assertThat(headers.headers()).containsEntry("Strict-Transport-Security", "max-age=10 ; includeSubDomains");
 
-        builder.xFrameOptions("deny");
-        assertThat(builder.headers()).containsEntry("X-Frame-Options", "deny");
+        headers.xFrameOptions(XFrameOptions.DENY);
+        assertThat(headers.headers()).containsEntry("X-Frame-Options", "deny");
 
-        builder.xFrameOptions("sameorigin");
-        assertThat(builder.headers()).containsEntry("X-Frame-Options", "sameorigin");
+        headers.xFrameOptions(XFrameOptions.SAMEORIGIN);
+        assertThat(headers.headers()).containsEntry("X-Frame-Options", "sameorigin");
 
-        builder.xFrameOptions("allow-from: web.de");
-        assertThat(builder.headers()).containsEntry("X-Frame-Options", "allow-from: web.de");
+        headers.xFrameOptions("web.de");
+        assertThat(headers.headers()).containsEntry("X-Frame-Options", "allow-from: web.de");
 
-        assertThatThrownBy(() -> builder.xFrameOptions("invalid"))
-                .hasMessage("X-Frame-Options must be deny | sameorigin | allow-from: DOMAIN");
+        headers.contentSecurityPolicy("foo");
+        assertThat(headers.headers()).containsEntry("Content-Security-Policy", "foo");
 
-        builder.contentSecurityPolicy("foo");
-        assertThat(builder.headers()).containsEntry("Content-Security-Policy", "foo");
+        headers.xPermittedCrossDomainPolicies(CrossDomainPolicy.MASTER_ONLY);
+        assertThat(headers.headers()).containsEntry("X-Permitted-Cross-Domain-Policies", "master-only");
 
-        builder.xPermittedCrossDomainPolicies(CrossDomainPolicy.MASTER_ONLY);
-        assertThat(builder.headers()).containsEntry("X-Permitted-Cross-Domain-Policies", "master-only");
+        headers.xPermittedCrossDomainPolicies(CrossDomainPolicy.NONE);
+        assertThat(headers.headers()).containsEntry("X-Permitted-Cross-Domain-Policies", "none");
 
-        builder.xPermittedCrossDomainPolicies(CrossDomainPolicy.NONE);
-        assertThat(builder.headers()).containsEntry("X-Permitted-Cross-Domain-Policies", "none");
+        headers.xPermittedCrossDomainPolicies(CrossDomainPolicy.BY_CONTENT_TYPE);
+        assertThat(headers.headers()).containsEntry("X-Permitted-Cross-Domain-Policies", "by-content-type");
 
-        builder.xPermittedCrossDomainPolicies(CrossDomainPolicy.BY_CONTENT_TYPE);
-        assertThat(builder.headers()).containsEntry("X-Permitted-Cross-Domain-Policies", "by-content-type");
+        headers.referrerPolicy(ReferrerPolicy.STRICT_ORIGIN);
+        assertThat(headers.headers()).containsEntry("Referrer-Policy", "strict-origin");
 
-        builder.referrerPolicy(ReferrerPolicy.STRICT_ORIGIN);
-        assertThat(builder.headers()).containsEntry("Referrer-Policy", "strict-origin");
+        headers.clearSiteData(ClearSiteData.ANY);
+        assertThat(headers.headers()).containsEntry("Clear-Site-Data", "\"*\"");
 
-        builder.clearSiteData(ClearSiteData.ANY);
-        assertThat(builder.headers()).containsEntry("Clear-Site-Data", "\"*\"");
+        headers.clearSiteData(ClearSiteData.ANY, ClearSiteData.EXECUTION_CONTEXTS, ClearSiteData.STORAGE);
+        assertThat(headers.headers()).containsEntry("Clear-Site-Data", "\"*\",\"executionContexts\",\"storage\"");
 
-        builder.clearSiteData(ClearSiteData.ANY, ClearSiteData.EXECUTION_CONTEXTS, ClearSiteData.STORAGE);
-        assertThat(builder.headers()).containsEntry("Clear-Site-Data", "\"*\",\"executionContexts\",\"storage\"");
+        headers.crossOriginEmbedderPolicy(CrossOriginEmbedderPolicy.UNSAFE_NONE);
+        assertThat(headers.headers()).containsEntry("Cross-Origin-Embedder-Policy", "unsafe-none");
 
-        builder.crossOriginEmbedderPolicy(CrossOriginEmbedderPolicy.UNSAFE_NONE);
-        assertThat(builder.headers()).containsEntry("Cross-Origin-Embedder-Policy", "unsafe-none");
+        headers.crossOriginOpenerPolicy(CrossOriginOpenerPolicy.SAME_ORIGIN_ALLOW_POPUPS);
+        assertThat(headers.headers()).containsEntry("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
 
-        builder.crossOriginOpenerPolicy(CrossOriginOpenerPolicy.SAME_ORIGIN_ALLOW_POPUPS);
-        assertThat(builder.headers()).containsEntry("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
-
-        builder.crossOriginResourcePolicy(CrossOriginResourcePolicy.SAME_SITE);
-        assertThat(builder.headers()).containsEntry("Cross-Origin-Resource-Policy", "same-site");
+        headers.crossOriginResourcePolicy(CrossOriginResourcePolicy.SAME_SITE);
+        assertThat(headers.headers()).containsEntry("Cross-Origin-Resource-Policy", "same-site");
     }
 
     @Test
     void testRegisterPlugin() throws Exception {
-        final SecureHeadersPlugin plugin = SecureHeadersPlugin.builder().build();
+        final SecureHeadersPlugin plugin = new SecureHeadersPlugin(headers -> {});
         final Javalin javalin = Javalin.create(config -> config.registerPlugin(plugin));
 
         final SecureHeadersPlugin retrievedPlugin = javalin.config.getPlugin(SecureHeadersPlugin.class);
@@ -104,10 +101,10 @@ class SecureHeadersPluginTests {
     // start a javalin webserver and check if everything is working in an end to end test
     @Test
     void runFullBlownIntegrationTest() throws Exception {
-        final SecureHeadersPlugin plugin = SecureHeadersPlugin.builder()
-                .xContentTypeOptionsNoSniff()
-                .clearSiteData(ClearSiteData.ANY)
-                .build();
+        final SecureHeadersPlugin plugin = new SecureHeadersPlugin(headers -> {
+            headers.xContentTypeOptionsNoSniff();
+            headers.clearSiteData(ClearSiteData.ANY);
+        });
         final Javalin javalin = Javalin.create(config -> config.registerPlugin(plugin));
 
         javalin.get("/", ctx -> {

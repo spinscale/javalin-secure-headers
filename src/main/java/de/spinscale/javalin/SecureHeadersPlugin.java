@@ -27,6 +27,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
@@ -37,8 +38,10 @@ public class SecureHeadersPlugin implements Plugin {
 
     private final Map<String, String> headers;
 
-    private SecureHeadersPlugin(Map<String, String> headers) {
-        this.headers = headers;
+    public SecureHeadersPlugin(Consumer<SecureHeaders> consumer) {
+        SecureHeaders secureHeaders = new SecureHeaders();
+        consumer.accept(secureHeaders);
+        this.headers = secureHeaders.headers();
     }
 
     @Override
@@ -46,47 +49,47 @@ public class SecureHeadersPlugin implements Plugin {
         app.after(ctx -> headers.forEach(ctx::header));
     }
 
-    public static Builder builder() {
-        return new Builder();
-    }
-
-    public static final class Builder {
+    public static final class SecureHeaders {
 
         private Map<String, String> headers = new HashMap<>(10);
 
+        // visible for testing
         Map<String, String> headers() {
             return Collections.unmodifiableMap(headers);
         }
 
         // Strict-Transport-Security: max-age=31536000 ; includeSubDomains
-        public Builder strictTransportSecurity(Duration duration, boolean includeSubdomains) {
+        public void strictTransportSecurity(Duration duration, boolean includeSubdomains) {
             if (includeSubdomains) {
                 headers.put("Strict-Transport-Security", "max-age=" + duration.getSeconds() + " ; includeSubDomains");
             } else {
                 headers.put("Strict-Transport-Security", "max-age=" + duration.getSeconds());
             }
-            return this;
         }
 
         // X-Frame-Options: deny | sameorigin | allow-from: DOMAIN
-        public Builder xFrameOptions(String option) {
-            if (!"deny".equals(option) && !"sameorigin".equals(option) && !option.startsWith("allow-from: ")) {
-                throw new IllegalArgumentException("X-Frame-Options must be deny | sameorigin | allow-from: DOMAIN");
+        public enum XFrameOptions { DENY, SAMEORIGIN;
+            private String headerValue() {
+                return name().toLowerCase(Locale.ROOT).replaceAll("_", "-");
             }
-            headers.put("X-Frame-Options", option);
-            return this;
+        }
+
+        public void xFrameOptions(XFrameOptions xFrameOptions) {
+            headers.put("X-Frame-Options", xFrameOptions.headerValue());
+        }
+
+        public void xFrameOptions(String domain) {
+            headers.put("X-Frame-Options", "allow-from: " + domain);
         }
 
         // X-Content-Type-Options: nosniff
-        public Builder xContentTypeOptionsNoSniff() {
+        public void xContentTypeOptionsNoSniff() {
             headers.put("X-Content-Type-Options", "nosniff");
-            return this;
         }
 
         // Content-Security-Policy: String... + JAVADOC
-        public Builder contentSecurityPolicy(String contentSecurityPolicy) {
+        public void contentSecurityPolicy(String contentSecurityPolicy) {
             headers.put("Content-Security-Policy", contentSecurityPolicy);
-            return this;
         }
 
         // X-Permitted-Cross-Domain-Policies: none | master-only | by-content-type | by-ftp-filename | all
@@ -95,9 +98,8 @@ public class SecureHeadersPlugin implements Plugin {
                 return name().toLowerCase(Locale.ROOT).replaceAll("_", "-");
             }
         }
-        public Builder xPermittedCrossDomainPolicies(CrossDomainPolicy policy) {
+        public void xPermittedCrossDomainPolicies(CrossDomainPolicy policy) {
             headers.put("X-Permitted-Cross-Domain-Policies", policy.headerValue());
-            return this;
         }
 
         // Referrer-Policy: no-referrer | no-referrer-when-downgrade | origin | origin-when-cross-origin | same-origin | strict-origin | strict-origin-when-cross-origin | unsafe-url
@@ -107,9 +109,8 @@ public class SecureHeadersPlugin implements Plugin {
             }
         }
 
-        public Builder referrerPolicy(ReferrerPolicy policy) {
+        public void referrerPolicy(ReferrerPolicy policy) {
             headers.put("Referrer-Policy", policy.headerValue());
-            return this;
         }
 
         // Clear-Site-Data: "cache" | "cookies" | "storage" | "executionContexts" | "*"
@@ -124,10 +125,9 @@ public class SecureHeadersPlugin implements Plugin {
                 return "\"" + name().toLowerCase(Locale.ROOT) + "\"";
             }
         }
-        public Builder clearSiteData(ClearSiteData ... data) {
+        public void clearSiteData(ClearSiteData... data) {
             String value = Arrays.stream(data).map(ClearSiteData::headerValue).collect(Collectors.joining(","));
             headers.put("Clear-Site-Data", value);
-            return this;
         }
 
         // Cross-Origin-Embedder-Policy: require-corp | unsafe-none
@@ -137,9 +137,8 @@ public class SecureHeadersPlugin implements Plugin {
             }
         }
 
-        public Builder crossOriginEmbedderPolicy(CrossOriginEmbedderPolicy policy) {
+        public void crossOriginEmbedderPolicy(CrossOriginEmbedderPolicy policy) {
             headers.put("Cross-Origin-Embedder-Policy", policy.headerValue());
-            return this;
         }
 
         // Cross-Origin-Opener-Policy: unsafe-none	| same-origin-allow-popups	| same-origin
@@ -149,9 +148,8 @@ public class SecureHeadersPlugin implements Plugin {
             }
         }
 
-        public Builder crossOriginOpenerPolicy(CrossOriginOpenerPolicy policy) {
+        public void crossOriginOpenerPolicy(CrossOriginOpenerPolicy policy) {
             headers.put("Cross-Origin-Opener-Policy", policy.headerValue());
-            return this;
         }
 
         // Cross-Origin-Resource-Policy: same-site	| same-origin | cross-origin
@@ -161,13 +159,8 @@ public class SecureHeadersPlugin implements Plugin {
             }
         }
 
-        public Builder crossOriginResourcePolicy(CrossOriginResourcePolicy policy) {
+        public void crossOriginResourcePolicy(CrossOriginResourcePolicy policy) {
             headers.put("Cross-Origin-Resource-Policy", policy.headerValue());
-            return this;
-        }
-
-        public SecureHeadersPlugin build() {
-            return new SecureHeadersPlugin(headers);
         }
     }
 }
